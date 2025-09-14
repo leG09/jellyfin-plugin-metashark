@@ -51,7 +51,7 @@ jobs:
       - name: Publish release
         uses: svenstaro/upload-release-action@v2
         with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          repo_token: ${{ secrets.GB_TOKEN }}
           file: ./artifacts/${{ env.artifact }}_*.zip
           tag: ${{ github.ref }}
           release_name: '${{ github.ref_name }}'
@@ -60,7 +60,7 @@ jobs:
       - name: Publish manifest
         uses: svenstaro/upload-release-action@v2
         with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          repo_token: ${{ secrets.GB_TOKEN }}
           file: ./manifest*.json
           tag: "manifest"
           overwrite: true
