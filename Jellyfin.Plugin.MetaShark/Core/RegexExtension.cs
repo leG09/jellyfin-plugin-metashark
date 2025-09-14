@@ -16,7 +16,15 @@ namespace Jellyfin.Plugin.MetaShark.Core
             var match = reg.Match(text);
             if (match.Success && match.Groups.Count > 1)
             {
-                return match.Groups[1].Value.Trim();
+                // 返回第一个非空的捕获组
+                for (int i = 1; i < match.Groups.Count; i++)
+                {
+                    var groupValue = match.Groups[i].Value.Trim();
+                    if (!string.IsNullOrEmpty(groupValue))
+                    {
+                        return groupValue;
+                    }
+                }
             }
 
             return defalutVal;

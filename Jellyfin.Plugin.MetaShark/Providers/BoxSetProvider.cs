@@ -141,12 +141,13 @@ namespace Jellyfin.Plugin.MetaShark.Providers
                         Overview = collection.Overview,
                     };
 
-                    var oldBotSet = _libraryManager.GetItemList(new InternalItemsQuery
+                    var itemList = _libraryManager.GetItemList(new InternalItemsQuery
                     {
                         IncludeItemTypes = new[] { BaseItemKind.BoxSet },
                         CollapseBoxSetItems = false,
                         Recursive = true
-                    }).Select(b => b as BoxSet).FirstOrDefault(x => x.Name == collection.Name);
+                    });
+                    var oldBotSet = itemList?.Select(b => b as BoxSet).FirstOrDefault(x => x?.Name == collection.Name);
                     if (oldBotSet != null)
                     {
                         item.LinkedChildren = oldBotSet.LinkedChildren;

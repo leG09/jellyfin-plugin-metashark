@@ -68,6 +68,33 @@ namespace Jellyfin.Plugin.MetaShark.Providers
 
             // 剧集信息只有tmdb有
             info.SeriesProviderIds.TryGetValue(MetadataProvider.Tmdb.ToString(), out var seriesTmdbId);
+            
+            // 如果Series没有TMDB ID，尝试从Series文件夹名中提取
+            if (string.IsNullOrEmpty(seriesTmdbId))
+            {
+                // 获取Series文件夹路径（向上两级：Episode -> Season -> Series）
+                var seriesPath = Path.GetDirectoryName(Path.GetDirectoryName(info.Path));
+                if (!string.IsNullOrEmpty(seriesPath))
+                {
+                    var seriesFolderName = Path.GetFileName(seriesPath);
+                    this.Log($"[Episode TMDB ID提取] 开始检查Series文件夹名: {seriesFolderName}");
+                    var tmdbIdFromSeriesFolder = this.regTmdbIdAttribute.FirstMatchGroup(seriesFolderName);
+                    if (!string.IsNullOrWhiteSpace(tmdbIdFromSeriesFolder))
+                    {
+                        this.Log($"[Episode TMDB ID提取] ✓ 成功从Series文件夹提取到TMDB ID: {tmdbIdFromSeriesFolder} (文件夹名: {seriesFolderName})");
+                        seriesTmdbId = tmdbIdFromSeriesFolder;
+                    }
+                    else
+                    {
+                        this.Log($"[Episode TMDB ID提取] ✗ Series文件夹中未找到TMDB ID格式 (文件夹名: {seriesFolderName})");
+                    }
+                }
+            }
+            else
+            {
+                this.Log($"[Episode TMDB ID提取] Series已存在TMDB ID: {seriesTmdbId}，跳过文件夹提取");
+            }
+            
             var seasonNumber = info.ParentIndexNumber;
             var episodeNumber = info.IndexNumber;
             result.HasMetadata = true;
