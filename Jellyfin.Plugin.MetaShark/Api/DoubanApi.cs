@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Jellyfin.Extensions.Json;
 using Microsoft.Extensions.Logging;
 using Jellyfin.Plugin.MetaShark.Model;
+using Jellyfin.Plugin.MetaShark.Core;
 using System.Threading;
 using System.Net.Http.Json;
 using System.Net;

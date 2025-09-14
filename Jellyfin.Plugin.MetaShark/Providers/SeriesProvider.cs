@@ -1,6 +1,7 @@
 ﻿using Jellyfin.Data.Enums;
 using Jellyfin.Plugin.MetaShark.Api;
 using Jellyfin.Plugin.MetaShark.Model;
+using Jellyfin.Plugin.MetaShark.Core;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Entities.TV;
 using MediaBrowser.Controller.Library;
