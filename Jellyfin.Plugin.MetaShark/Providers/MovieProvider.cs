@@ -43,20 +43,23 @@ namespace Jellyfin.Plugin.MetaShark.Providers
                 return result;
             }
 
-            // 从douban搜索
-            var res = await this._doubanApi.SearchMovieAsync(info.Name, cancellationToken).ConfigureAwait(false);
-            result.AddRange(res.Take(Configuration.PluginConfiguration.MAX_SEARCH_RESULT).Select(x =>
+            // 从douban搜索（可禁用）
+            if (this.config.EnableDouban)
             {
-                return new RemoteSearchResult
+                var res = await this._doubanApi.SearchMovieAsync(info.Name, cancellationToken).ConfigureAwait(false);
+                result.AddRange(res.Take(Configuration.PluginConfiguration.MAX_SEARCH_RESULT).Select(x =>
                 {
-                    // 注意：jellyfin 会判断电影所有 provider id 是否有相同的，有相同的值就会认为是同一影片，会被合并不返回，必须保持 provider id 的唯一性
-                    // 这里 Plugin.ProviderId 的值做这么复杂，是为了保持唯一
-                    ProviderIds = new Dictionary<string, string> { { DoubanProviderId, x.Sid }, { Plugin.ProviderId, $"{MetaSource.Douban}_{x.Sid}" } },
-                    ImageUrl = this.GetProxyImageUrl(x.Img),
-                    ProductionYear = x.Year,
-                    Name = x.Name,
-                };
-            }));
+                    return new RemoteSearchResult
+                    {
+                        // 注意：jellyfin 会判断电影所有 provider id 是否有相同的，有相同的值就会认为是同一影片，会被合并不返回，必须保持 provider id 的唯一性
+                        // 这里 Plugin.ProviderId 的值做这么复杂，是为了保持唯一
+                        ProviderIds = new Dictionary<string, string> { { DoubanProviderId, x.Sid }, { Plugin.ProviderId, $"{MetaSource.Douban}_{x.Sid}" } },
+                        ImageUrl = this.GetProxyImageUrl(x.Img),
+                        ProductionYear = x.Year,
+                        Name = x.Name,
+                    };
+                }));
+            }
 
 
             // 从tmdb搜索
@@ -126,10 +129,35 @@ namespace Jellyfin.Plugin.MetaShark.Providers
                 }
 
                 // 自动扫描搜索匹配元数据
-                sid = await this.GuessByDoubanAsync(info, cancellationToken).ConfigureAwait(false);
+                if (this.config.EnableDouban)
+                {
+                    sid = await this.GuessByDoubanAsync(info, cancellationToken).ConfigureAwait(false);
+                }
+                else if (this.config.EnableTmdb)
+                {
+                    // 直接尝试 TMDB 匹配
+                    var parseResult = NameParser.Parse(this.GetOriginalFileName(info));
+                    var guessName = !string.IsNullOrEmpty(parseResult.ChineseName) ? parseResult.ChineseName : parseResult.Name;
+                    if (parseResult.Year > 0)
+                    {
+                        tmdbId = await this.GuestByTmdbAsync(guessName, parseResult.Year, info, cancellationToken).ConfigureAwait(false);
+                    }
+                    if (string.IsNullOrEmpty(tmdbId))
+                    {
+                        tmdbId = await this.GuestByTmdbAsync(guessName, info.Year, info, cancellationToken).ConfigureAwait(false);
+                    }
+                    if (!string.IsNullOrEmpty(tmdbId))
+                    {
+                        var tmdbResult = await this.GetMetadataByTmdb(tmdbId, info, cancellationToken).ConfigureAwait(false);
+                        if (tmdbResult != null && tmdbResult.HasMetadata)
+                        {
+                            return tmdbResult;
+                        }
+                    }
+                }
             }
 
-            if (metaSource != MetaSource.Tmdb && !string.IsNullOrEmpty(sid))
+            if (this.config.EnableDouban && metaSource != MetaSource.Tmdb && !string.IsNullOrEmpty(sid))
             {
                 this.Log($"GetMovieMetadata of douban [sid]: \"{sid}\"");
                 var subject = await this._doubanApi.GetMovieAsync(sid, cancellationToken).ConfigureAwait(false);

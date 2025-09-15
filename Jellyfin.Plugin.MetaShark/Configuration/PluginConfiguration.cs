@@ -20,6 +20,10 @@ public class PluginConfiguration : BasePluginConfiguration
 
     public string DoubanCookies { get; set; } = string.Empty;
     /// <summary>
+    /// 启用豆瓣
+    /// </summary>
+    public bool EnableDouban { get; set; } = true;
+    /// <summary>
     /// 豆瓣开启防封禁
     /// </summary>
     public bool EnableDoubanAvoidRiskControl { get; set; } = false;

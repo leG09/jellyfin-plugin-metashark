@@ -111,6 +111,10 @@ namespace Jellyfin.Plugin.MetaShark.Providers
 
         protected async Task<string?> GuessByDoubanAsync(ItemLookupInfo info, CancellationToken cancellationToken)
         {
+            if (!config.EnableDouban)
+            {
+                return null;
+            }
             var fileName = GetOriginalFileName(info);
             // 从文件名属性格式获取，如[douban-12345]或[doubanid-12345]
             var doubanId = this.regDoubanIdAttribute.FirstMatchGroup(fileName);
@@ -189,6 +193,10 @@ namespace Jellyfin.Plugin.MetaShark.Providers
 
         public async Task<string?> GuestDoubanSeasonByYearAsync(string seriesName, int? year, int? seasonNumber, CancellationToken cancellationToken)
         {
+            if (!config.EnableDouban)
+            {
+                return null;
+            }
             if (year == null || year == 0)
             {
                 return null;
@@ -238,6 +246,10 @@ namespace Jellyfin.Plugin.MetaShark.Providers
 
         public async Task<string?> GuestDoubanSeasonBySeasonNameAsync(string name, int? seasonNumber, CancellationToken cancellationToken)
         {
+            if (!config.EnableDouban)
+            {
+                return null;
+            }
             if (seasonNumber is null or 0)
             {
                 return null;

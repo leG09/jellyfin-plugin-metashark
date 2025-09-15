@@ -42,19 +42,22 @@ namespace Jellyfin.Plugin.MetaShark.Providers
                 return result;
             }
 
-            // 从douban搜索
-            var res = await this._doubanApi.SearchTVAsync(info.Name, cancellationToken).ConfigureAwait(false);
-            result.AddRange(res.Take(Configuration.PluginConfiguration.MAX_SEARCH_RESULT).Select(x =>
+            // 从douban搜索（可禁用）
+            if (this.config.EnableDouban)
             {
-                return new RemoteSearchResult
+                var res = await this._doubanApi.SearchTVAsync(info.Name, cancellationToken).ConfigureAwait(false);
+                result.AddRange(res.Take(Configuration.PluginConfiguration.MAX_SEARCH_RESULT).Select(x =>
                 {
-                    // 这里 Plugin.ProviderId 的值做这么复杂，是为了和电影保持一致并唯一
-                    ProviderIds = new Dictionary<string, string> { { DoubanProviderId, x.Sid }, { Plugin.ProviderId, $"{MetaSource.Douban}_{x.Sid}" } },
-                    ImageUrl = this.GetProxyImageUrl(x.Img),
-                    ProductionYear = x.Year,
-                    Name = x.Name,
-                };
-            }));
+                    return new RemoteSearchResult
+                    {
+                        // 这里 Plugin.ProviderId 的值做这么复杂，是为了和电影保持一致并唯一
+                        ProviderIds = new Dictionary<string, string> { { DoubanProviderId, x.Sid }, { Plugin.ProviderId, $"{MetaSource.Douban}_{x.Sid}" } },
+                        ImageUrl = this.GetProxyImageUrl(x.Img),
+                        ProductionYear = x.Year,
+                        Name = x.Name,
+                    };
+                }));
+            }
 
             // 尝试从tmdb搜索
             if (this.config.EnableTmdbSearch)
@@ -114,10 +117,23 @@ namespace Jellyfin.Plugin.MetaShark.Providers
             if (!hasDoubanMeta && !hasTmdbMeta)
             {
                 // 自动扫描搜索匹配元数据
-                sid = await this.GuessByDoubanAsync(info, cancellationToken).ConfigureAwait(false);
+                if (this.config.EnableDouban)
+                {
+                    sid = await this.GuessByDoubanAsync(info, cancellationToken).ConfigureAwait(false);
+                }
+                else if (this.config.EnableTmdb)
+                {
+                    var parseResult = NameParser.Parse(this.GetOriginalFileName(info));
+                    var guessName = !string.IsNullOrEmpty(parseResult.ChineseName) ? parseResult.ChineseName : parseResult.Name;
+                    var newTmdbId = await this.FindTmdbId(guessName, string.Empty, parseResult.Year, info, cancellationToken).ConfigureAwait(false);
+                    if (!string.IsNullOrEmpty(newTmdbId))
+                    {
+                        return await this.GetMetadataByTmdb(newTmdbId, info, cancellationToken).ConfigureAwait(false);
+                    }
+                }
             }
 
-            if (metaSource != MetaSource.Tmdb && !string.IsNullOrEmpty(sid))
+            if (this.config.EnableDouban && metaSource != MetaSource.Tmdb && !string.IsNullOrEmpty(sid))
             {
                 this.Log($"GetSeriesMetadata of douban [sid]: {sid}");
                 var subject = await this._doubanApi.GetMovieAsync(sid, cancellationToken).ConfigureAwait(false);
