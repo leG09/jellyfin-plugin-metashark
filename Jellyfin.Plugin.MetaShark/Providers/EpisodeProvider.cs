@@ -83,6 +83,8 @@ namespace Jellyfin.Plugin.MetaShark.Providers
                     {
                         this.Log($"[Episode TMDB ID提取] ✓ 成功从Series文件夹提取到TMDB ID: {tmdbIdFromSeriesFolder} (文件夹名: {seriesFolderName})");
                         seriesTmdbId = tmdbIdFromSeriesFolder;
+                        // 将提取到的TMDB ID设置到info中，供后续EpisodeImageProvider使用
+                        info.SeriesProviderIds[MetadataProvider.Tmdb.ToString()] = seriesTmdbId;
                     }
                     else
                     {
