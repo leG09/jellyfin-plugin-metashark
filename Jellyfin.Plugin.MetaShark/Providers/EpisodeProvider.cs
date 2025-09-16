@@ -173,67 +173,76 @@ namespace Jellyfin.Plugin.MetaShark.Providers
             {
                 return info;
             }
-            var parseResult = NameParser.ParseEpisode(fileName);
-            info.Year = parseResult.Year;
-            info.Name = parseResult.ChineseName ?? parseResult.Name;
-
-            // 文件名带有季数数据时，从文件名解析出季数进行修正
-            // 修正文件名有特殊命名 SXXEPXX 时，默认解析到错误季数的问题，如神探狄仁杰 Detective.Dee.S01EP01.2006.2160p.WEB-DL.x264.AAC-HQC
-            // TODO: 会导致覆盖用户手动修改元数据的季数
-            if (parseResult.ParentIndexNumber.HasValue && parseResult.ParentIndexNumber > 0 && info.ParentIndexNumber != parseResult.ParentIndexNumber)
+            
+            try
             {
-                this.Log("FixSeasonNumber by anitomy. old: {0} new: {1}", info.ParentIndexNumber, parseResult.ParentIndexNumber);
-                info.ParentIndexNumber = parseResult.ParentIndexNumber;
-            }
+                var parseResult = NameParser.ParseEpisode(fileName);
+                info.Year = parseResult.Year;
+                info.Name = parseResult.ChineseName ?? parseResult.Name;
 
-            // // 修正anime命名格式导致的seasonNumber错误（从season元数据读取)
-            // if (info.ParentIndexNumber is null)
-            // {
-            //     var episodeItem = this._libraryManager.FindByPath(info.Path, false);
-            //     var season = episodeItem != null ? ((Episode)episodeItem).Season : null;
-            //     if (season != null && season.IndexNumber.HasValue && info.ParentIndexNumber != season.IndexNumber)
-            //     {
-            //         info.ParentIndexNumber = season.IndexNumber;
-            //         this.Log("FixSeasonNumber by season. old: {0} new: {1}", info.ParentIndexNumber, season.IndexNumber);
-            //     }
-            // }
-
-            // 从季文件夹名称猜出 season number
-            // 没有 season 级目录或部分特殊不规范命名，会变成虚拟季，ParentIndexNumber 默认设为 1
-            // https://github.com/jellyfin/jellyfin/blob/926470829d91d93b4c0b22c5b8b89a791abbb434/Emby.Server.Implementations/Library/LibraryManager.cs#L2626
-            var isVirtualSeason = this.IsVirtualSeason(info);
-            var seasonFolderPath = this.GetOriginalSeasonPath(info);
-            if (info.ParentIndexNumber is null or 1 && isVirtualSeason && seasonFolderPath != null)
-            {
-                var guestSeasonNumber = this.GuessSeasonNumberByDirectoryName(seasonFolderPath);
-                if (guestSeasonNumber.HasValue && guestSeasonNumber != info.ParentIndexNumber)
+                // 文件名带有季数数据时，从文件名解析出季数进行修正
+                // 修正文件名有特殊命名 SXXEPXX 时，默认解析到错误季数的问题，如神探狄仁杰 Detective.Dee.S01EP01.2006.2160p.WEB-DL.x264.AAC-HQC
+                // TODO: 会导致覆盖用户手动修改元数据的季数
+                if (parseResult.ParentIndexNumber.HasValue && parseResult.ParentIndexNumber > 0 && info.ParentIndexNumber != parseResult.ParentIndexNumber)
                 {
-                    this.Log("FixSeasonNumber by season path. old: {0} new: {1}", info.ParentIndexNumber, guestSeasonNumber);
-                    info.ParentIndexNumber = guestSeasonNumber;
+                    this.Log("FixSeasonNumber by anitomy. old: {0} new: {1}", info.ParentIndexNumber, parseResult.ParentIndexNumber);
+                    info.ParentIndexNumber = parseResult.ParentIndexNumber;
                 }
-            }
 
-            // 识别特典
-            if (info.ParentIndexNumber is null && NameParser.IsAnime(fileName) && (parseResult.IsSpecial || NameParser.IsSpecialDirectory(info.Path)))
+                // // 修正anime命名格式导致的seasonNumber错误（从season元数据读取)
+                // if (info.ParentIndexNumber is null)
+                // {
+                //     var episodeItem = this._libraryManager.FindByPath(info.Path, false);
+                //     var season = episodeItem != null ? ((Episode)episodeItem).Season : null;
+                //     if (season != null && season.IndexNumber.HasValue && info.ParentIndexNumber != season.IndexNumber)
+                //     {
+                //         info.ParentIndexNumber = season.IndexNumber;
+                //         this.Log("FixSeasonNumber by season. old: {0} new: {1}", info.ParentIndexNumber, season.IndexNumber);
+                //     }
+                // }
+
+                // 从季文件夹名称猜出 season number
+                // 没有 season 级目录或部分特殊不规范命名，会变成虚拟季，ParentIndexNumber 默认设为 1
+                // https://github.com/jellyfin/jellyfin/blob/926470829d91d93b4c0b22c5b8b89a791abbb434/Emby.Server.Implementations/Library/LibraryManager.cs#L2626
+                var isVirtualSeason = this.IsVirtualSeason(info);
+                var seasonFolderPath = this.GetOriginalSeasonPath(info);
+                if (info.ParentIndexNumber is null or 1 && isVirtualSeason && seasonFolderPath != null)
+                {
+                    var guestSeasonNumber = this.GuessSeasonNumberByDirectoryName(seasonFolderPath);
+                    if (guestSeasonNumber.HasValue && guestSeasonNumber != info.ParentIndexNumber)
+                    {
+                        this.Log("FixSeasonNumber by season path. old: {0} new: {1}", info.ParentIndexNumber, guestSeasonNumber);
+                        info.ParentIndexNumber = guestSeasonNumber;
+                    }
+                }
+
+                // 识别特典
+                if (info.ParentIndexNumber is null && NameParser.IsAnime(fileName) && (parseResult.IsSpecial || NameParser.IsSpecialDirectory(info.Path)))
+                {
+                    this.Log("FixSeasonNumber to special. old: {0} new: 0", info.ParentIndexNumber);
+                    info.ParentIndexNumber = 0;
+                }
+
+                // 特典优先使用文件名（特典除了前面特别设置，还有 SXX/Season XX 等默认的）
+                if (info.ParentIndexNumber.HasValue && info.ParentIndexNumber == 0)
+                {
+                    info.Name = parseResult.SpecialName == info.Name ? fileName : parseResult.SpecialName;
+                }
+
+                // 修正 episode number
+                if (parseResult.IndexNumber.HasValue && info.IndexNumber != parseResult.IndexNumber)
+                {
+                    this.Log("FixEpisodeNumber by anitomy. old: {0} new: {1}", info.IndexNumber, parseResult.IndexNumber);
+                    info.IndexNumber = parseResult.IndexNumber;
+                }
+
+                return info;
+            }
+            catch (Exception ex)
             {
-                this.Log("FixSeasonNumber to special. old: {0} new: 0", info.ParentIndexNumber);
-                info.ParentIndexNumber = 0;
+                this.Log($"Error parsing episode filename '{fileName}' in FixParseInfo: {ex.Message}");
+                return info;
             }
-
-            // 特典优先使用文件名（特典除了前面特别设置，还有 SXX/Season XX 等默认的）
-            if (info.ParentIndexNumber.HasValue && info.ParentIndexNumber == 0)
-            {
-                info.Name = parseResult.SpecialName == info.Name ? fileName : parseResult.SpecialName;
-            }
-
-            // 修正 episode number
-            if (parseResult.IndexNumber.HasValue && info.IndexNumber != parseResult.IndexNumber)
-            {
-                this.Log("FixEpisodeNumber by anitomy. old: {0} new: {1}", info.IndexNumber, parseResult.IndexNumber);
-                info.IndexNumber = parseResult.IndexNumber;
-            }
-
-            return info;
         }
 
 
@@ -246,50 +255,58 @@ namespace Jellyfin.Plugin.MetaShark.Providers
                 return null;
             }
 
-            var parseResult = NameParser.ParseEpisode(fileName);
-            if (parseResult.IsExtra)
+            try
             {
-                this.Log($"Found anime extra of [name]: {fileName}");
-                var result = new MetadataResult<Episode>();
-                result.HasMetadata = true;
-
-                // 假如已有ParentIndexNumber，设为特典覆盖掉（设为null不会替换旧值）
-                if (info.ParentIndexNumber.HasValue)
+                var parseResult = NameParser.ParseEpisode(fileName);
+                if (parseResult.IsExtra)
                 {
+                    this.Log($"Found anime extra of [name]: {fileName}");
+                    var result = new MetadataResult<Episode>();
+                    result.HasMetadata = true;
+
+                    // 假如已有ParentIndexNumber，设为特典覆盖掉（设为null不会替换旧值）
+                    if (info.ParentIndexNumber.HasValue)
+                    {
+                        result.Item = new Episode
+                        {
+                            ParentIndexNumber = 0,
+                            IndexNumber = null,
+                            Name = parseResult.ExtraName,
+                        };
+                        return result;
+                    }
+
+                    // 没ParentIndexNumber时只修改名称
                     result.Item = new Episode
                     {
-                        ParentIndexNumber = 0,
-                        IndexNumber = null,
                         Name = parseResult.ExtraName,
                     };
                     return result;
                 }
 
-                // 没ParentIndexNumber时只修改名称
-                result.Item = new Episode
-                {
-                    Name = parseResult.ExtraName,
-                };
-                return result;
+                //// 特典也有 tmdb 剧集信息，不在这里处理
+                // if (parseResult.IsSpecial || NameParser.IsSpecialDirectory(info.Path))
+                // {
+                //     this.Log($"Found anime sp of [name]: {fileName}");
+                //     var result = new MetadataResult<Episode>();
+                //     result.HasMetadata = true;
+                //     result.Item = new Episode
+                //     {
+                //         ParentIndexNumber = 0,
+                //         IndexNumber = parseResult.IndexNumber,
+                //         Name = parseResult.SpecialName == info.Name ? fileName : parseResult.SpecialName,
+                //     };
+
+                //     return result;
+                // }
+
+                return null;
             }
-
-            //// 特典也有 tmdb 剧集信息，不在这里处理
-            // if (parseResult.IsSpecial || NameParser.IsSpecialDirectory(info.Path))
-            // {
-            //     this.Log($"Found anime sp of [name]: {fileName}");
-            //     var result = new MetadataResult<Episode>();
-            //     result.HasMetadata = true;
-            //     result.Item = new Episode
-            //     {
-            //         ParentIndexNumber = 0,
-            //         IndexNumber = parseResult.IndexNumber,
-            //         Name = parseResult.SpecialName == info.Name ? fileName : parseResult.SpecialName,
-            //     };
-
-            //     return result;
-            // }
-
-            return null;
+            catch (Exception ex)
+            {
+                this.Log($"Error parsing episode filename '{fileName}': {ex.Message}");
+                return null;
+            }
         }
 
 
